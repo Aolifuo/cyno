@@ -2,13 +2,14 @@
 #define CYNO_EXCEPTION_HANDLER_H_
 
 #include <exception>
+#include "cyno/http/HttpMessage.h"
 
 namespace cyno {
 
 // Interface
 class ExceptionHandler {
 public:
-    virtual void handle(std::exception_ptr eptr) = 0;
+    virtual int handle(std::exception_ptr eptr, HttpResponse& resp) = 0;
     virtual ~ExceptionHandler() = default;
 };
 

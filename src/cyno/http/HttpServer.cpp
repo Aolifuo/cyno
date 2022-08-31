@@ -28,8 +28,14 @@ struct HttpServer::Impl {
     
     asio::awaitable<void> run_accept();
     asio::awaitable<void> handle_request(asio::ip::tcp::socket socket);
-    HttpResponse dispatch(HttpRequest&);
+
+    void dispatch(HttpRequest&, HttpResponse&);
+
+    template<typename Rep, typename Per>
+    asio::awaitable<void> timeout(std::chrono::duration<Rep, Per>);
 };
+
+void perfect_response(HttpResponse&, int status);
 
 CLASS_PIMPL_IMPLEMENT(HttpServer)
 
@@ -83,60 +89,64 @@ asio::awaitable<void> HttpServer::Impl::run_accept() {
 
 asio::awaitable<void> HttpServer::Impl::handle_request(asio::ip::tcp::socket socket) {
     // 
-    std::string buffer;
-    asio::steady_timer timer(socket.get_executor());
     HttpRequestParser parser;
-    
+    HttpRequest& req = parser.result();
+    HttpResponse resp;
+
+    std::string buffer;
     buffer.reserve(4 * 1024);
 
     try {
-        // read until \r\n\r\n
-        timer.expires_after(5s);
-        co_await (
-            asio::async_read_until(socket, asio::dynamic_buffer(buffer),
-                                    "\r\n\r\n", asio::use_awaitable)
-            || timer.async_wait(asio::use_awaitable)
-        );
+        for (; ;) {
+            buffer.clear();
+            // read until \r\n\r\n
+            co_await asio::async_read_until(socket, asio::dynamic_buffer(buffer),
+                                                "\r\n\r\n", asio::use_awaitable);
+            try {
+                // parse first line and headers
+                parser.parse({buffer.data(), buffer.size()});
 
-        // check if timeout
+                // read body
+                buffer.resize(4 * 1024);
+                for (; parser.state() != HttpRequestParser::Success; ) {
+                    size_t read_len = co_await socket.async_read_some(asio::buffer(buffer),
+                                                                        asio::use_awaitable);
+                    parser.parse({buffer.data(), read_len});
+                }
+                
+                // dispatch
+                auto url = parse_http_request_url(req.url);
+                req.path = std::move(url.path);
+                req.query = std::move(url.query);
+                dispatch(req, resp);
 
-        parser.parse({buffer.data(), buffer.size()});
+            } catch(...) {
+                if (exception_handler) {
+                    int status = exception_handler->handle(std::current_exception(), resp);
+                    perfect_response(resp, status);
+                } else {
+                    break;
+                }
+            }
 
-        // read body
-        buffer.resize(4 * 1024);
-        for (; parser.state() != HttpRequestParser::Success; ) {
-            size_t read_len = co_await socket.async_read_some(asio::buffer(buffer),
-                                                                asio::use_awaitable);
+            buffer.clear();
+            write_response_to_buffer(resp, buffer);
+
+            // send
+            co_await asio::async_write(socket, asio::buffer(buffer), 
+                                            asio::use_awaitable);
             
-            parser.parse({buffer.data(), read_len});
+            // keepalive
+            if (!req.should_keep_alive) {
+                break;
+            }
         }
-        
-        // dispatch
-        auto url = parse_http_request_url(parser.result().url);
-        parser.result().path = std::move(url.path);
-        parser.result().query = std::move(url.query);
-        auto resp = dispatch(parser.result());
-        
-        // send
-        buffer.clear();
-        auto write_len = write_response_to_buffer(resp, buffer);
-        co_await asio::async_write(socket, asio::buffer(buffer, write_len), 
-                                        asio::use_awaitable);
-
-    } catch(...) {
-        if (exception_handler) {
-            exception_handler->handle(std::current_exception());
-        }
+    } catch(const std::system_error& err) {
+        //
     }
 }
 
-
-
-HttpResponse HttpServer::Impl::dispatch(HttpRequest& req) {
-    // resp
-    HttpResponse resp;
-    resp.version = "HTTP/1.1";
-
+void HttpServer::Impl::dispatch(HttpRequest& req, HttpResponse& resp) {
     // interceptor
     for (auto& aop : interceptors) {
         if (!aop->before(req, resp)) {
@@ -146,18 +156,22 @@ HttpResponse HttpServer::Impl::dispatch(HttpRequest& req) {
 
     // router
     int status = router.match(http_method_str(req.method), req.path)(req, resp);
-    resp.status_code = static_cast<HttpResponse::Status>(status);
-    resp.status = http_status_str(resp.status_code);
-    resp.content_length = resp.body.length();
+    perfect_response(resp, status);
 
     // interceptor
     for (auto it = interceptors.rbegin(); it != interceptors.rend(); ++it) {
         (*it)->after(req, resp);
     }
 
-    return resp;
 }
 
+void perfect_response(HttpResponse& resp, int status) {
+    resp.version = "HTTP/1.1";
+    resp.status_code = static_cast<HttpResponse::Status>(status);
+    resp.status = http_status_str(resp.status_code);
 
+    resp.content_length = resp.body.length();
+    resp.headers["Content-Length"] = std::to_string(resp.content_length);
+}
 
 }

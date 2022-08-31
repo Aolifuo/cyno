@@ -162,7 +162,7 @@ inline size_t write_response_to_buffer(HttpResponse& resp, std::string& buffer) 
     len += 2;
     buffer.append("\r\n");
     len += resp.body.length();
-    buffer.append(resp.body, 0, resp.content_length);
+    buffer.append(resp.body);
     return len;
 }
 

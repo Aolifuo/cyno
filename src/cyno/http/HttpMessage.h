@@ -40,8 +40,6 @@ struct HttpResponse {
     int data(std::string_view type, std::string_view content) {
         body = content;
         headers["Content-Type"] = type;
-        headers["Content-Length"] = std::to_string(body.length());
-        content_length = body.length();
         return Status::HTTP_STATUS_OK;
     }
 
