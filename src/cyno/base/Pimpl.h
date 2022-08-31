@@ -7,26 +7,26 @@ public: \
     CLASS& operator=(CLASS &&); \
     ~CLASS(); \
 private: \
-    struct Data; \
-    CLASS(Data*); \
-    Data* data; \
+    struct Impl; \
+    CLASS(Impl*); \
+    Impl* impl; \
 
 #define CLASS_PIMPL_IMPLEMENT(CLASS) \
-CLASS::CLASS(Data* d) { \
-    data = d; \
+CLASS::CLASS(Impl* d) { \
+    impl = d; \
 } \
 CLASS::CLASS(CLASS&& other) { \
-    data = other.data; \
-    other.data = nullptr; \
+    impl = other.impl; \
+    other.impl = nullptr; \
 } \
 CLASS& CLASS::operator=(CLASS&& other) { \
-    data = other.data; \
-    other.data = nullptr; \
+    impl = other.impl; \
+    other.impl = nullptr; \
     return *this; \
 } \
 CLASS::~CLASS() { \
-    if (data) { \
-        delete data; \
+    if (impl) { \
+        delete impl; \
     } \
 }
 
