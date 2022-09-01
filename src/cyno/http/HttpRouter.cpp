@@ -1,7 +1,6 @@
 #include "cyno/http/HttpRouter.h"
 
 #include <map>
-#include <cstdio>
 #include "cyno/base/Exceptions.h"
 
 namespace cyno {

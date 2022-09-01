@@ -11,6 +11,18 @@ public:
     using Base::Base;
 };
 
+class HttpResponseError:public std::runtime_error {
+    using Base = std::runtime_error;
+public:
+    using Base::Base;
+};
+
+class IllegalUrlError: public std::runtime_error {
+    using Base = std::runtime_error;
+public:
+    using Base::Base;
+};
+
 class IllegalRouteError: public std::runtime_error {
     using Base = std::runtime_error;
 public:
@@ -34,6 +46,7 @@ class TimeoutError: public std::runtime_error {
 public:
     using Base::Base;
 };
+
 
 
 }

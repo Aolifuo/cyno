@@ -25,7 +25,7 @@ struct HttpServer::Impl {
     HttpRouter router;
     std::unique_ptr<ExceptionHandler> exception_handler;
     std::vector<std::unique_ptr<HttpInterceptor>> interceptors;
-    
+
     asio::awaitable<void> run_accept();
     asio::awaitable<void> handle_request(asio::ip::tcp::socket socket);
 
@@ -89,9 +89,11 @@ asio::awaitable<void> HttpServer::Impl::run_accept() {
 
 asio::awaitable<void> HttpServer::Impl::handle_request(asio::ip::tcp::socket socket) {
     // 
-    HttpRequestParser parser;
+    HttpParser<HttpRequest> parser;
     HttpRequest& req = parser.result();
     HttpResponse resp;
+
+    asio::steady_timer timer(io_context);
 
     std::string buffer;
     buffer.reserve(4 * 1024);
@@ -99,16 +101,19 @@ asio::awaitable<void> HttpServer::Impl::handle_request(asio::ip::tcp::socket soc
     try {
         for (; ;) {
             buffer.clear();
+            //timer.expires_after(5s);
             // read until \r\n\r\n
-            co_await asio::async_read_until(socket, asio::dynamic_buffer(buffer),
-                                                "\r\n\r\n", asio::use_awaitable);
+            co_await (asio::async_read_until(socket, asio::dynamic_buffer(buffer),
+                                                "\r\n\r\n", asio::use_awaitable)
+                        //|| timer.async_wait(asio::use_awaitable)
+                        );
             try {
                 // parse first line and headers
                 parser.parse({buffer.data(), buffer.size()});
 
                 // read body
                 buffer.resize(4 * 1024);
-                for (; parser.state() != HttpRequestParser::Success; ) {
+                for (; parser.state() != HttpParser<HttpRequest>::Success; ) {
                     size_t read_len = co_await socket.async_read_some(asio::buffer(buffer),
                                                                         asio::use_awaitable);
                     parser.parse({buffer.data(), read_len});
@@ -129,9 +134,7 @@ asio::awaitable<void> HttpServer::Impl::handle_request(asio::ip::tcp::socket soc
                 }
             }
 
-            buffer.clear();
-            write_response_to_buffer(resp, buffer);
-
+            buffer.assign(serialize_response(resp));
             // send
             co_await asio::async_write(socket, asio::buffer(buffer), 
                                             asio::use_awaitable);
@@ -173,5 +176,6 @@ void perfect_response(HttpResponse& resp, int status) {
     resp.content_length = resp.body.length();
     resp.headers["Content-Length"] = std::to_string(resp.content_length);
 }
+
 
 }

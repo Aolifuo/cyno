@@ -3,17 +3,18 @@
 
 #include "cyno/base/Exceptions.h"
 #include "cyno/http/HttpMessage.h"
-#include "http_parser.h"
 
 namespace cyno {
 
-class HttpRequestParser {
+template<typename T>
+requires (std::is_same_v<T, HttpRequest> || std::is_same_v<T, HttpResponse>)
+class HttpParser {
 public:
     enum State {
         NotStarted, Parsing, Fail, Success
     };
 
-    HttpRequestParser() {
+    HttpParser() {
         settings_ = http_parser_settings{
             .on_message_begin = on_message_begin,
             .on_url = on_url,
@@ -25,32 +26,40 @@ public:
             .on_message_complete = on_message_complete,
         };
 
-        http_parser_init(&parser_, http_parser_type::HTTP_REQUEST);
+        http_parser_init(&parser_, http_parser_type::HTTP_BOTH);
         parser_.data = static_cast<void*>(this);
         state_ = NotStarted;
     }
 
     void restart() {
-        req_ = HttpRequest{};
-        http_parser_init(&parser_, http_parser_type::HTTP_REQUEST);
+        result_ = T{};
+        http_parser_init(&parser_, http_parser_type::HTTP_BOTH);
         parser_.data = static_cast<void*>(this);
         state_ = NotStarted;
     }
 
     // throw HttpRequestError
-    void parse(std::string_view request) {
-        http_parser_execute(&parser_, &settings_, request.data(), request.length());
+    void parse(std::string_view str) {
+        http_parser_execute(&parser_, &settings_, str.data(), str.length());
         if (parser_.http_errno != http_errno::HPE_OK) {
             state_ = Fail;
             throw HttpRequestError(http_errno_description(HTTP_PARSER_ERRNO(&parser_)));
         }
 
-        req_.method = static_cast<http_method>(parser_.method);
-        req_.should_keep_alive = http_should_keep_alive(&parser_);
+        result_.should_keep_alive = http_should_keep_alive(&parser_);
+        
+        if constexpr (std::is_same_v<T, HttpRequest>) {
+            // request
+            result_.method = static_cast<http_method>(parser_.method);
+        } else {
+            // response
+            result_.status_code = static_cast<http_status>(parser_.status_code);
+        }
+        
     }
 
-    HttpRequest& result() {
-        return req_;
+    T& result() {
+        return result_;
     }
 
     State state() {
@@ -58,8 +67,8 @@ public:
     }
 
 private:
-    static HttpRequestParser& hook(void * data) {
-        return *static_cast<HttpRequestParser*>(data);
+    static HttpParser& hook(void * data) {
+        return *static_cast<HttpParser*>(data);
     }
 
     static int on_message_begin(http_parser* parser) {
@@ -68,12 +77,16 @@ private:
     }
 
     static int on_url(http_parser* parser, const char* at, size_t len) {
-        hook(parser->data).req_.url.assign(at, len);
+        if constexpr (std::is_same_v<T, HttpRequest>) {
+            hook(parser->data).result_.url.assign(at, len);
+        }
         return 0;
     }
 
-    static int on_status(http_parser*, const char* at, size_t len) {
-        
+    static int on_status(http_parser* parser, const char* at, size_t len) {
+        if constexpr (std::is_same_v<T, HttpResponse>) {
+            hook(parser->data).result_.status.assign(at, len);
+        }
         return 0;
     }
 
@@ -84,17 +97,17 @@ private:
 
     static int on_header_value(http_parser* parser, const char* at, size_t len) {
         hook(parser->data).current_kv_.second.assign(at, len);
-        hook(parser->data).req_.headers.insert(std::move(hook(parser->data).current_kv_));
+        hook(parser->data).result_.headers.insert(std::move(hook(parser->data).current_kv_));
         return 0;
     }
 
     static int on_headers_complete(http_parser* parser) {
-         hook(parser->data).req_.content_length = parser->content_length;
+         hook(parser->data).result_.content_length = parser->content_length;
         return 0;
     }
 
     static int on_body(http_parser* parser, const char* at, size_t len) {
-        hook(parser->data).req_.body.append(at,len);
+        hook(parser->data).result_.body.append(at,len);
         return 0;
     }
 
@@ -107,7 +120,7 @@ private:
     http_parser_settings settings_;
     State state_;
 
-    HttpRequest req_;
+    T result_;
     std::pair<std::string, std::string> current_kv_;
 };
 
@@ -142,28 +155,6 @@ inline HttpRequestUrl parse_http_request_url(std::string_view url) {
     }
 
     return res;
-}
-
-inline size_t write_response_to_buffer(HttpResponse& resp, std::string& buffer) {
-    size_t len = resp.version.length() + 1 + 3 + 1 + resp.status.length() + 2;
-    buffer.append(resp.version);
-    buffer.append(" ");
-    buffer.append(std::to_string(resp.status_code));
-    buffer.append(" ");
-    buffer.append(resp.status);
-    buffer.append("\r\n");
-    for (auto&& [key, value] : resp.headers) {
-        len += key.length() + 2 + value.length() + 2;
-        buffer.append(key);
-        buffer.append(": ");
-        buffer.append(value);
-        buffer.append("\r\n");
-    }
-    len += 2;
-    buffer.append("\r\n");
-    len += resp.body.length();
-    buffer.append(resp.body);
-    return len;
 }
 
 }
