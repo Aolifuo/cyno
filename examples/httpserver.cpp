@@ -1,7 +1,7 @@
 #include "cyno/http/HttpRouter.h"
 #include "cyno/http/HttpServer.h"
 
-#include <iostream>
+#include "spdlog/spdlog.h"
 
 using namespace std;
 using namespace cyno;
@@ -13,7 +13,7 @@ public:
             rethrow_exception(eptr);
         } catch(const exception& e) {
             resp.plain(e.what());
-            cerr << e.what() << endl;
+            spdlog::warn("{}", e.what());
         }
 
         return 400;
@@ -23,28 +23,28 @@ public:
 class MyInterceptor: public HttpInterceptor {
 public:
     bool before(HttpRequest& req, HttpResponse& resp) override {
-        cout << "before interceptor\n";
+        spdlog::info("before interceptor");
         return true;
     }
 
     void after(HttpRequest& req, HttpResponse& resp) override {
-        cout << "after interceptor\n";
+        spdlog::info("before interceptor");
     }
 };
 
 HttpRouter my_router() {
     HttpRouter router;
     router.GET("/login", [](HttpRequest& req, HttpResponse& resp) {
-        cout << "username" << req.query["username"] << " password" << req.query["password"] << '\n';
+        spdlog::info("username: {} password: {}", req.query["username"], req.query["password"]);
 
         return resp.plain("login succeeded");
     });
 
     router.POST("/info/*", [](HttpRequest& req, HttpResponse& resp) {
         for (auto& token : req.path) {
-            cout << token << " ";
+            spdlog::info("{}", token);
         }
-        cout << "\n" << req.body << '\n';
+        spdlog::info("{}", req.body);
 
         return 200;
     });
@@ -54,17 +54,19 @@ HttpRouter my_router() {
 
 int main() {
     try {
+        spdlog::set_pattern("[%C-%m-%d %H:%M:%S] [%^%l%$] %v");
+
         asio::io_context ioc;
 
         HttpServer server(ioc);
         server.routes(my_router());
         server.add_interceptor(make_unique<MyInterceptor>());
         server.exception_handler(make_unique<MyExceptionHandler>());
-        server.bind("[::1]", 8080);
+        server.bind("127.0.0.1", 8080);
         server.start();
 
         ioc.run();
     } catch(const exception& e) {
-        std::printf("%s\n", e.what());
+        spdlog::critical("{}", e.what());
     }
 }

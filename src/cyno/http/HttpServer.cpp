@@ -1,7 +1,6 @@
 #include "cyno/http/HttpRouter.h"
 #include "cyno/http/HttpServer.h"
 
-#include <iostream>
 #include "asio/ip/tcp.hpp"
 #include "asio/co_spawn.hpp"
 #include "asio/detached.hpp"
@@ -10,6 +9,7 @@
 #include "asio/write.hpp"
 #include "asio/steady_timer.hpp"
 #include "asio/experimental/awaitable_operators.hpp"
+#include "spdlog/spdlog.h"
 
 #include "cyno/http/HttpParser.h"
 
@@ -28,7 +28,6 @@ struct HttpServer::Impl {
 
     asio::awaitable<void> run_accept();
     asio::awaitable<void> process(asio::ip::tcp::socket socket);
-
     void dispatch(HttpRequest&, HttpResponse&);
 };
 
@@ -80,7 +79,7 @@ asio::awaitable<void> HttpServer::Impl::run_accept() {
                 asio::detached);
         }
     } catch(const std::system_error& e) {
-        std::printf("system error happened in run_accept: %s\n", e.what());
+        spdlog::error("system error happened in run_accept: %s\n", e.what());
     }
 }
 
@@ -140,7 +139,7 @@ asio::awaitable<void> HttpServer::Impl::process(asio::ip::tcp::socket socket) {
             }
         }
     } catch(const std::system_error& err) {
-        //
+        spdlog::error("System error happend when receive or send: {}", err.what());
     }
 }
 

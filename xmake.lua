@@ -2,7 +2,7 @@ set_project("cyno")
 set_version("0.0.1")
 
 add_rules("mode.debug", "mode.release")
-add_requires("asio", "http_parser")
+add_requires("asio", "http_parser", "spdlog", "fmt")
 add_cxxflags("/EHa", "/EHs")
 set_languages("cxx20")
 set_warnings("all")
@@ -17,7 +17,7 @@ target("cyno")
     add_files("src/cyno/**.cpp")
     add_includedirs("src", {public = true})
     add_defines("ASIO_HAS_CO_AWAIT")
-    add_packages("asio", "http_parser")
+    add_packages("asio", "http_parser", "spdlog")
 
 --examples
 for _, dir in ipairs(os.files("examples/*.cpp")) do
@@ -26,5 +26,5 @@ for _, dir in ipairs(os.files("examples/*.cpp")) do
         add_files(dir)
         add_deps("cyno")
         add_defines("ASIO_HAS_CO_AWAIT")
-        add_packages("asio", "http_parser")
+        add_packages("asio", "http_parser", "spdlog")
 end

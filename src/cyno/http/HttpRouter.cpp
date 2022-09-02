@@ -157,8 +157,6 @@ HttpRouter::HttpHandler& HttpRouter::match(std::string_view method, const std::v
         join_path.append(str);
     }
 
-    // std::printf("join path: %s\n", join_path.c_str());
-
     if (auto it = impl->exact_map.find(join_path); it != impl->exact_map.end()) {
         return it->second;
     }
