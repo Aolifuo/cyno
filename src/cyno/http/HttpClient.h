@@ -5,6 +5,7 @@
 #include "asio/io_context.hpp"
 #include "cyno/base/Pimpl.h"
 #include "cyno/http/HttpMessage.h"
+#include <string_view>
 
 namespace cyno {
 
@@ -14,8 +15,9 @@ class HttpClient {
 
 public:
     // throw
-    static asio::awaitable<HttpResponse> execute(std::string_view url, bool should_keep_alive = false);
-    static asio::awaitable<HttpResponse> execute(HttpRequest req);
+    static asio::awaitable<HttpResponse> execute(std::string url);
+    static asio::awaitable<HttpResponse> execute(const HttpRequest& req, std::string host, std::string service);
+    static asio::awaitable<HttpResponse> execute(std::string req_str, std::string host, std::string service);
 };
 
 }

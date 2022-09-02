@@ -1,7 +1,7 @@
 #include "cyno/http/HttpRouter.h"
 #include "cyno/http/HttpServer.h"
 
-#include <cstdio>
+#include <iostream>
 #include "asio/ip/tcp.hpp"
 #include "asio/co_spawn.hpp"
 #include "asio/detached.hpp"
@@ -27,12 +27,9 @@ struct HttpServer::Impl {
     std::vector<std::unique_ptr<HttpInterceptor>> interceptors;
 
     asio::awaitable<void> run_accept();
-    asio::awaitable<void> handle_request(asio::ip::tcp::socket socket);
+    asio::awaitable<void> process(asio::ip::tcp::socket socket);
 
     void dispatch(HttpRequest&, HttpResponse&);
-
-    template<typename Rep, typename Per>
-    asio::awaitable<void> timeout(std::chrono::duration<Rep, Per>);
 };
 
 void perfect_response(HttpResponse&, int status);
@@ -78,7 +75,7 @@ asio::awaitable<void> HttpServer::Impl::run_accept() {
             asio::co_spawn(acceptor.get_executor(), 
                 [this, sock = std::move(socket)]() mutable 
                 {
-                    return handle_request(std::move(sock));
+                    return process(std::move(sock));
                 },
                 asio::detached);
         }
@@ -87,13 +84,11 @@ asio::awaitable<void> HttpServer::Impl::run_accept() {
     }
 }
 
-asio::awaitable<void> HttpServer::Impl::handle_request(asio::ip::tcp::socket socket) {
+asio::awaitable<void> HttpServer::Impl::process(asio::ip::tcp::socket socket) {
     // 
     HttpParser<HttpRequest> parser;
     HttpRequest& req = parser.result();
-    HttpResponse resp;
-
-    asio::steady_timer timer(io_context);
+    HttpResponse resp = HttpResponse::from_default();
 
     std::string buffer;
     buffer.reserve(4 * 1024);
@@ -169,7 +164,6 @@ void HttpServer::Impl::dispatch(HttpRequest& req, HttpResponse& resp) {
 }
 
 void perfect_response(HttpResponse& resp, int status) {
-    resp.version = "HTTP/1.1";
     resp.status_code = static_cast<HttpResponse::Status>(status);
     resp.status = http_status_str(resp.status_code);
 

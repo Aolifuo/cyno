@@ -15,6 +15,7 @@ struct HttpRequestUrl {
 
 struct HttpRequest {
     using Method = http_method;
+
     Method method;
     std::string url;
     std::string version;
@@ -26,6 +27,19 @@ struct HttpRequest {
 
     size_t content_length = 0;
     bool should_keep_alive = true;
+
+    static HttpRequest from_default() {
+        HttpRequest req;
+        req.method = Method::HTTP_GET;
+        req.url = "/";
+        req.version = "HTTP/1.1";
+        req.headers["User-Agent"] = "cyno/0.0.1";
+        req.headers["Accept"] = "*/*";
+        req.headers["Accept-Encoding"] = "gzip, deflate, br";
+        req.headers["Connection"] = "keep-alive";
+        req.headers["Content-Length"] = "0";
+        return req;
+    }
 };
 
 struct HttpResponse {
@@ -38,6 +52,17 @@ struct HttpResponse {
 
     size_t content_length = 0;
     bool should_keep_alive = true;
+
+    static HttpResponse from_default() {
+        HttpResponse resp;
+        resp.version = "HTTP/1.1";
+        resp.status_code = Status::HTTP_STATUS_OK;
+        resp.status = "OK";
+        resp.headers["Connection"] = "keep-alive";
+        resp.headers["Content-Length"] = "0";
+
+        return resp;
+    }
 
     int data(std::string_view type, std::string_view content) {
         body = content;

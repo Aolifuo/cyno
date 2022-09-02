@@ -1,7 +1,7 @@
 #include "cyno/http/HttpRouter.h"
 #include "cyno/http/HttpServer.h"
 
-#include <cstdio>
+#include <iostream>
 
 using namespace std;
 using namespace cyno;
@@ -13,7 +13,7 @@ public:
             rethrow_exception(eptr);
         } catch(const exception& e) {
             resp.plain(e.what());
-            std::printf("error: %s\n", e.what());
+            cerr << e.what() << endl;
         }
 
         return 400;
@@ -23,27 +23,29 @@ public:
 class MyInterceptor: public HttpInterceptor {
 public:
     bool before(HttpRequest& req, HttpResponse& resp) override {
-        std::printf("before interceptor\n");
+        cout << "before interceptor\n";
         return true;
     }
 
     void after(HttpRequest& req, HttpResponse& resp) override {
-        std::printf("after interceptor\n");
+        cout << "after interceptor\n";
     }
 };
 
 HttpRouter my_router() {
     HttpRouter router;
     router.GET("/login", [](HttpRequest& req, HttpResponse& resp) {
-        std::printf("username: %s, password: %s\n", 
-                    req.query["username"].c_str(), req.query["password"].c_str());
+        cout << "username" << req.query["username"] << " password" << req.query["password"] << '\n';
 
         return resp.plain("login succeeded");
     });
 
     router.POST("/info/*", [](HttpRequest& req, HttpResponse& resp) {
-        std::printf("body:\n %s\n", req.body.c_str());
-        // resp.headers["Connection"] = "close";
+        for (auto& token : req.path) {
+            cout << token << " ";
+        }
+        cout << "\n" << req.body << '\n';
+
         return 200;
     });
 

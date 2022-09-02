@@ -9,7 +9,7 @@ using namespace cyno;
 
 asio::awaitable<void> amain() {
     try {
-        auto resp = co_await HttpClient::execute("http://[::1]:8080/login?username=1&password=2");
+        auto resp = co_await HttpClient::execute("https://www.baidu.com");
         cout << resp.body << '\n';
     } catch(const std::exception& e) {
         cout << e.what() << '\n';

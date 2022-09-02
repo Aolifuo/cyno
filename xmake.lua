@@ -19,9 +19,8 @@ target("cyno")
     add_defines("ASIO_HAS_CO_AWAIT")
     add_packages("asio", "http_parser")
 
---tests
-
-for _, dir in ipairs(os.files("tests/*.cpp")) do
+--examples
+for _, dir in ipairs(os.files("examples/*.cpp")) do
     target(path.basename(dir))
         set_kind("binary")
         add_files(dir)
