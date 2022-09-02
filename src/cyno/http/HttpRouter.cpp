@@ -117,19 +117,19 @@ HttpRouter::HttpRouter() {
     impl = new Impl;
 }
 
-void HttpRouter::GET(std::string_view path, HttpHandler handler) {
+void HttpRouter::Get(std::string_view path, HttpHandler handler) {
     insert_handler("GET", path, handler);
 }
 
-void HttpRouter::POST(std::string_view path, HttpHandler handler) {
+void HttpRouter::Post(std::string_view path, HttpHandler handler) {
     insert_handler("POST", path, handler);
 }
 
-void HttpRouter::PUT(std::string_view path, HttpHandler handler) {
+void HttpRouter::Put(std::string_view path, HttpHandler handler) {
     insert_handler("PUT", path, handler);
 }
 
-void HttpRouter::DELETE(std::string_view path, HttpHandler handler) {
+void HttpRouter::Delete(std::string_view path, HttpHandler handler) {
     insert_handler("DELETE", path, handler);
 }
 

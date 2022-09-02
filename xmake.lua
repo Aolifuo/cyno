@@ -14,7 +14,8 @@ end
 -- libcyno
 target("cyno")
     set_kind("static")
-    add_files("src/cyno/**.cpp")
+    add_rules("c++.unity_build", {batchsize = 0})
+    add_files("src/cyno/**.cpp", {unity_group = "cyno"})
     add_includedirs("src", {public = true})
     add_defines("ASIO_HAS_CO_AWAIT")
     add_packages("asio", "http_parser", "spdlog")

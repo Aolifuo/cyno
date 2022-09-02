@@ -34,13 +34,13 @@ public:
 
 HttpRouter my_router() {
     HttpRouter router;
-    router.GET("/login", [](HttpRequest& req, HttpResponse& resp) {
+    router.Get("/login", [](HttpRequest& req, HttpResponse& resp) {
         spdlog::info("username: {} password: {}", req.query["username"], req.query["password"]);
 
         return resp.plain("login succeeded");
     });
 
-    router.POST("/info/*", [](HttpRequest& req, HttpResponse& resp) {
+    router.Post("/info/*", [](HttpRequest& req, HttpResponse& resp) {
         for (auto& token : req.path) {
             spdlog::info("{}", token);
         }

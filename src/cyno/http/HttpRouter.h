@@ -15,10 +15,10 @@ public:
     HttpRouter();
     using HttpHandler = std::function<int(HttpRequest&, HttpResponse&)>;
 
-    void GET(std::string_view path, HttpHandler handler);
-    void POST(std::string_view path, HttpHandler handler);
-    void PUT(std::string_view path, HttpHandler handler);
-    void DELETE(std::string_view path, HttpHandler handler);
+    void Get(std::string_view path, HttpHandler handler);
+    void Post(std::string_view path, HttpHandler handler);
+    void Put(std::string_view path, HttpHandler handler);
+    void Delete(std::string_view path, HttpHandler handler);
 
     HttpHandler& match(std::string_view method, const std::vector<std::string>& path);
 private:

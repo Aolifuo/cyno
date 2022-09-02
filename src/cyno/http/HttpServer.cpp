@@ -79,7 +79,7 @@ asio::awaitable<void> HttpServer::Impl::run_accept() {
                 asio::detached);
         }
     } catch(const std::system_error& e) {
-        spdlog::error("system error happened in run_accept: %s\n", e.what());
+        spdlog::error("System error happened in run_accept: %s\n", e.what());
     }
 }
 
@@ -139,7 +139,7 @@ asio::awaitable<void> HttpServer::Impl::process(asio::ip::tcp::socket socket) {
             }
         }
     } catch(const std::system_error& err) {
-        spdlog::error("System error happend when receive or send: {}", err.what());
+        spdlog::error("System error happend when receiving or sending: {}", err.what());
     }
 }
 
