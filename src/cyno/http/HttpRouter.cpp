@@ -152,6 +152,9 @@ void HttpRouter::insert_handler(std::string_view method, std::string_view path, 
 
 HttpRouter::HttpHandler& HttpRouter::match(std::string_view method, const std::vector<std::string>& path) {
     std::string join_path(method);
+    if (path.empty()) {
+        join_path.append("/");
+    }
     for (auto& str : path) {
         join_path.append("/");
         join_path.append(str);

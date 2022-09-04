@@ -24,17 +24,22 @@ public:
 class MyInterceptor: public HttpInterceptor {
 public:
     bool before(HttpRequest& req, HttpResponse& resp) override {
-        spdlog::info("before interceptor");
+        // spdlog::info("before interceptor");
         return true;
     }
 
     void after(HttpRequest& req, HttpResponse& resp) override {
-        spdlog::info("before interceptor");
+        // spdlog::info("after interceptor");
     }
 };
 
 HttpRouter my_router() {
     HttpRouter router;
+
+    router.Get("/", [](HttpRequest& req, HttpResponse& resp) {
+        return 200;
+    });
+
     router.Get("/login", [](HttpRequest& req, HttpResponse& resp) {
         spdlog::info("username: {} password: {}", req.query["username"], req.query["password"]);
 

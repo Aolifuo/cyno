@@ -5,50 +5,56 @@
 
 namespace cyno {
 
-class HttpRequestError: public std::runtime_error {
+class CynoRuntimeError: public std::runtime_error {
     using Base = std::runtime_error;
 public:
     using Base::Base;
 };
 
-class HttpResponseError:public std::runtime_error {
-    using Base = std::runtime_error;
+class HttpRequestError: public CynoRuntimeError {
+    using Base = CynoRuntimeError;
 public:
     using Base::Base;
 };
 
-class IllegalUrlError: public std::runtime_error {
-    using Base = std::runtime_error;
+class HttpResponseError:public CynoRuntimeError {
+    using Base = CynoRuntimeError;
 public:
     using Base::Base;
 };
 
-class IllegalRouteError: public std::runtime_error {
-    using Base = std::runtime_error;
+class IllegalUrlError: public CynoRuntimeError {
+    using Base = CynoRuntimeError;
 public:
     using Base::Base;
 };
 
-class NotMatchPathError: public std::runtime_error {
-    using Base = std::runtime_error;
+class IllegalRouteError: public CynoRuntimeError {
+    using Base = CynoRuntimeError;
 public:
     using Base::Base;
 };
 
-class InterceptorError: public std::runtime_error {
-    using Base = std::runtime_error;
+class NotMatchPathError: public CynoRuntimeError {
+    using Base = CynoRuntimeError;
 public:
     using Base::Base;
 };
 
-class TimeoutError: public std::runtime_error {
-    using Base = std::runtime_error;
+class InterceptorError: public CynoRuntimeError {
+    using Base = CynoRuntimeError;
 public:
     using Base::Base;
 };
 
-class ResourceExhaustedError: public std::runtime_error {
-    using Base = std::runtime_error;
+class TimeoutError: public CynoRuntimeError {
+    using Base = CynoRuntimeError;
+public:
+    using Base::Base;
+};
+
+class ResourceExhaustedError: public CynoRuntimeError {
+    using Base = CynoRuntimeError;
 public:
     using Base::Base;
 };

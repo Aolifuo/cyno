@@ -1,7 +1,7 @@
-#include "cyno/base/configs.h"
 #include "cyno/http/HttpRouter.h"
 #include "cyno/http/HttpServer.h"
 
+#include "spdlog/spdlog.h"
 #include "asio/ip/tcp.hpp"
 #include "asio/co_spawn.hpp"
 #include "asio/detached.hpp"
@@ -9,8 +9,6 @@
 #include "asio/read_until.hpp"
 #include "asio/write.hpp"
 #include "asio/steady_timer.hpp"
-#include "asio/experimental/awaitable_operators.hpp"
-#include "spdlog/spdlog.h"
 
 #include "cyno/base/ResourcePool.h"
 #include "cyno/http/HttpParser.h"
@@ -18,7 +16,6 @@
 namespace cyno {
 
 using namespace std::chrono_literals;
-using namespace asio::experimental::awaitable_operators;
 
 struct HttpServer::Impl {
     inline static std::pmr::synchronized_pool_resource sync_pool;
@@ -98,7 +95,7 @@ asio::awaitable<void> HttpServer::Impl::run_accept() {
                 asio::detached);
         }
     } catch(const std::system_error& e) {
-        spdlog::error("System error happened in run_accept: %s\n", e.what());
+        spdlog::error("System error happened in run_accept: {}\n", e.what());
     }
 }
 
@@ -107,7 +104,7 @@ asio::awaitable<void> HttpServer::Impl::process(asio::ip::tcp::socket socket) {
     HttpParser<HttpRequest> parser;
     HttpRequest& req = parser.result();
     HttpResponse resp = HttpResponse::from_default();
-    asio::steady_timer timer(executor, 60s);
+    asio::steady_timer timer(executor);
     
     try {
         // borrow buffer
@@ -116,9 +113,10 @@ asio::awaitable<void> HttpServer::Impl::process(asio::ip::tcp::socket socket) {
         for (; ;) {
             buffer->clear();
             
+            timer.expires_after(60s);
             timer.async_wait([&socket](std::error_code err) {
                 if (!err) {
-                    spdlog::warn("Accept first line and headers timeout");
+                    spdlog::warn("Accept requst first line and headers timeout");
                     socket.close();
                 }
             });
@@ -132,9 +130,17 @@ asio::awaitable<void> HttpServer::Impl::process(asio::ip::tcp::socket socket) {
 
                 // read body
                 buffer->resize(4 * 1024);
+                timer.expires_after(60s);
                 for (; parser.state() != HttpParser<HttpRequest>::Success; ) {
+                    timer.async_wait([&socket](std::error_code err) {
+                        if (!err) {
+                            spdlog::warn("Accept request body timeout");
+                            socket.close();
+                        }
+                    });
                     size_t read_len = co_await socket.async_read_some(asio::buffer(*buffer),
                                                                         asio::use_awaitable);
+                    timer.cancel_one();
                     parser.parse({buffer->data(), read_len});
                 }
                 
@@ -144,7 +150,7 @@ asio::awaitable<void> HttpServer::Impl::process(asio::ip::tcp::socket socket) {
                 req.query = std::move(url.query);
                 dispatch(req, resp);
 
-            } catch(...) {
+            } catch(const CynoRuntimeError& err) {
                 if (exception_handler) {
                     int status = exception_handler->handle(std::current_exception(), resp);
                     perfect_response(resp, status);
