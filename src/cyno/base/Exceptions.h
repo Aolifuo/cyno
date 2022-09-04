@@ -47,6 +47,11 @@ public:
     using Base::Base;
 };
 
+class ResourceExhaustedError: public std::runtime_error {
+    using Base = std::runtime_error;
+public:
+    using Base::Base;
+};
 
 
 }
