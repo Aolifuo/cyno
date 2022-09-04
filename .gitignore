@@ -7,4 +7,5 @@ build/
 
 .vscode/
 .cache/
+tests/
 compile_commands.json

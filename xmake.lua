@@ -29,3 +29,14 @@ for _, dir in ipairs(os.files("examples/*.cpp")) do
         add_defines("ASIO_HAS_CO_AWAIT")
         add_packages("asio", "http_parser", "spdlog")
 end
+
+--tests
+for _, dir in ipairs(os.files("tests/*.cpp")) do
+    target(path.basename(dir))
+        set_kind("binary")
+        add_files(dir)
+        add_deps("cyno")
+        add_defines("ASIO_HAS_CO_AWAIT")
+        add_packages("asio", "http_parser", "spdlog")
+        set_group("tests")
+end
