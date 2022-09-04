@@ -11,6 +11,7 @@ asio::awaitable<void> amain() {
     try {
         auto resp = co_await HttpClient::execute("https://www.baidu.com");
         
+        spdlog::info("{}", resp.body);
     } catch(const std::exception& e) {
         spdlog::error("{}", e.what());
     }
