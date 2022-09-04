@@ -1,6 +1,7 @@
 #include "cyno/http/HttpRouter.h"
 #include "cyno/http/HttpServer.h"
 
+#include "asio/io_context.hpp"
 #include "spdlog/spdlog.h"
 
 using namespace std;
@@ -41,9 +42,6 @@ HttpRouter my_router() {
     });
 
     router.Post("/info/*", [](HttpRequest& req, HttpResponse& resp) {
-        for (auto& token : req.path) {
-            spdlog::info("{}", token);
-        }
         spdlog::info("{}", req.body);
 
         return 200;
@@ -58,7 +56,7 @@ int main() {
 
         asio::io_context ioc;
 
-        HttpServer server(ioc);
+        HttpServer server(ioc.get_executor());
         server.routes(my_router());
         server.add_interceptor(make_unique<MyInterceptor>());
         server.exception_handler(make_unique<MyExceptionHandler>());

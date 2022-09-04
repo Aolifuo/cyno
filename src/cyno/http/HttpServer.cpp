@@ -19,7 +19,7 @@ using namespace std::chrono_literals;
 using namespace asio::experimental::awaitable_operators;
 
 struct HttpServer::Impl {
-    asio::io_context& io_context;
+    asio::any_io_executor executor;
     asio::ip::tcp::acceptor acceptor;
 
     HttpRouter router;
@@ -35,13 +35,13 @@ void perfect_response(HttpResponse&, int status);
 
 CLASS_PIMPL_IMPLEMENT(HttpServer)
 
-HttpServer::HttpServer(asio::io_context& ioc) {
-    impl = new Impl{ioc, asio::ip::tcp::acceptor{ioc}};
+HttpServer::HttpServer(asio::any_io_executor executor) {
+    impl = new Impl{executor, asio::ip::tcp::acceptor{executor}};
 }
 
 void HttpServer::bind(std::string_view host, unsigned port) {
     asio::ip::tcp::endpoint ep(asio::ip::make_address(host), port);
-    impl->acceptor = asio::ip::tcp::acceptor(impl->io_context, ep);
+    impl->acceptor = asio::ip::tcp::acceptor(impl->executor, ep);
 }
 
 void HttpServer::routes(HttpRouter router) {
@@ -57,7 +57,7 @@ void HttpServer::exception_handler(std::unique_ptr<ExceptionHandler> handler) {
 }
 
 void HttpServer::start() {
-    asio::co_spawn(impl->io_context, impl->run_accept(), asio::detached);
+    asio::co_spawn(impl->executor, impl->run_accept(), asio::detached);
 }
 
 void HttpServer::stop() {
@@ -88,19 +88,24 @@ asio::awaitable<void> HttpServer::Impl::process(asio::ip::tcp::socket socket) {
     HttpParser<HttpRequest> parser;
     HttpRequest& req = parser.result();
     HttpResponse resp = HttpResponse::from_default();
-
+    asio::steady_timer timer(executor, 10s);
     std::string buffer;
     buffer.reserve(4 * 1024);
 
     try {
         for (; ;) {
             buffer.clear();
-            //timer.expires_after(5s);
+            
+            timer.async_wait([&socket](std::error_code err) {
+                if (!err) {
+                    spdlog::warn("Accept first line and headers timeout");
+                    socket.close();
+                }
+            });
             // read until \r\n\r\n
-            co_await (asio::async_read_until(socket, asio::dynamic_buffer(buffer),
-                                                "\r\n\r\n", asio::use_awaitable)
-                        //|| timer.async_wait(asio::use_awaitable)
-                        );
+            co_await asio::async_read_until(socket, asio::dynamic_buffer(buffer),
+                                                "\r\n\r\n", asio::use_awaitable);
+            timer.cancel_one();
             try {
                 // parse first line and headers
                 parser.parse({buffer.data(), buffer.size()});

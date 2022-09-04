@@ -3,22 +3,14 @@
 
 #include <memory>
 #include <mutex>
-#include <deque>
 #include "asio/awaitable.hpp"
-#include "asio/io_context.hpp"
 #include "asio/steady_timer.hpp"
 #include "asio/use_awaitable.hpp"
 #include "cyno/base/Exceptions.h"
+#include "cyno/base/configs.h"
 
 namespace cyno {
 
-struct PoolConfig {
-    size_t core_idle_size;
-    size_t max_idle_size;
-    size_t max_active_size;
-    size_t max_idle_time; 
-    size_t wait_timeout;
-};
 
 template<typename T, typename Executor = asio::any_io_executor>
 class ResourcePool {
@@ -42,6 +34,9 @@ public:
         timer_.expires_after(std::chrono::milliseconds(config_.max_idle_time));
         run_scheduled_cleanup_task();
     }
+
+    ResourcePool(ResourcePool &&) = delete;
+    ResourcePool& operator=(ResourcePool &&) = delete;
 
     asio::awaitable<std::shared_ptr<T>> borrow() {
         std::unique_lock lk(mutex_);
@@ -79,6 +74,10 @@ public:
             std::unique_ptr<T>(elem), 
             std::chrono::steady_clock::now() + std::chrono::milliseconds(config_.max_idle_time)
         });
+    }
+
+    executor_type get_executor() {
+        return executor_;
     }
 private:
 
