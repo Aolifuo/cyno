@@ -11,6 +11,7 @@ if is_mode("release") then
     set_optimize("faster")
 end
 
+
 -- libcyno
 target("cyno")
     set_kind("static")
@@ -34,9 +35,9 @@ end
 for _, dir in ipairs(os.files("tests/*.cpp")) do
     target(path.basename(dir))
         set_kind("binary")
+        set_group("tests")
         add_files(dir)
         add_deps("cyno")
         add_defines("ASIO_HAS_CO_AWAIT")
         add_packages("asio", "http_parser", "spdlog")
-        set_group("tests")
 end

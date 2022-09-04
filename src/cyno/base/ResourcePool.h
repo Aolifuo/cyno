@@ -2,7 +2,7 @@
 #define CYNO_RESOURECEPOOL_H_
 
 #include <memory>
-#include <mutex>
+#include <memory_resource>
 #include "asio/awaitable.hpp"
 #include "asio/steady_timer.hpp"
 #include "asio/use_awaitable.hpp"
@@ -11,10 +11,11 @@
 
 namespace cyno {
 
-
 template<typename T, typename Executor = asio::any_io_executor>
 class ResourcePool {
 public:
+    inline static std::pmr::unsynchronized_pool_resource pool_resource;
+
     using executor_type = Executor;
 
     struct Item {
@@ -27,6 +28,7 @@ public:
         , config_(config)
         , initializer(std::move(init))
         , timer_(executor_)
+        , idle_list_(&pool_resource)
     {
         for (size_t i = 0 ; i < config_.core_idle_size; ++i) {
             idle_list_.push_back({std::make_unique<T>(initializer())});
@@ -112,7 +114,7 @@ private:
     // idle = idle_list_.size()
     // active = active_size_
     // all = idle + active
-    std::list<Item> idle_list_;
+    std::pmr::list<Item> idle_list_;
     size_t active_size_ = 0;
     std::mutex mutex_;
 };
