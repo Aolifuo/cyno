@@ -12,6 +12,7 @@
 
 #include "cyno/base/ResourcePool.h"
 #include "cyno/http/HttpParser.h"
+#include "cyno/http/HttpConfig.h"
 
 namespace cyno {
 
@@ -29,16 +30,10 @@ struct HttpServer::Impl {
 
     ResourcePool<std::pmr::string> buffer_resource{
         executor, 
-        PoolConfig{
-            .core_idle_size = 100,
-            .max_idle_size = 300,
-            .max_active_size = 500,
-            .max_idle_time = 1000 * 60,
-            .wait_timeout = 1000 * 10
-        },
+        PoolConfig(http_config.buffer_pool_config),
         []{
             std::pmr::string str(&ResourcePool<std::pmr::string>::pool_resource);
-            str.reserve(1024 * 4);
+            str.reserve(http_config.request_config.max_line_and_headers_size);
             return str;
         }};
 
@@ -113,13 +108,22 @@ asio::awaitable<void> HttpServer::Impl::process(asio::ip::tcp::socket socket) {
         for (; ;) {
             buffer->clear();
             
-            timer.expires_after(60s);
+            // set timeout
+            if (req.should_keep_alive) {
+                timer.expires_after(
+                    std::chrono::milliseconds(http_config.request_config.keepalive_timeout));
+            } else {
+                timer.expires_after(
+                    std::chrono::milliseconds(http_config.request_config.receive_headers_timeout));
+            }
+            
             timer.async_wait([&socket](std::error_code err) {
                 if (!err) {
                     spdlog::warn("Accept requst first line and headers timeout");
                     socket.close();
                 }
             });
+
             // read until \r\n\r\n
             co_await asio::async_read_until(socket, asio::dynamic_buffer(*buffer),
                                                 "\r\n\r\n", asio::use_awaitable);
@@ -128,9 +132,11 @@ asio::awaitable<void> HttpServer::Impl::process(asio::ip::tcp::socket socket) {
                 // parse first line and headers
                 parser.parse({buffer->data(), buffer->size()});
 
+                // set timeout
+                buffer->resize(http_config.request_config.max_line_and_headers_size);
+                timer.expires_after(
+                    std::chrono::milliseconds(http_config.request_config.receive_body_timeout));
                 // read body
-                buffer->resize(4 * 1024);
-                timer.expires_after(60s);
                 for (; parser.state() != HttpParser<HttpRequest>::Success; ) {
                     timer.async_wait([&socket](std::error_code err) {
                         if (!err) {
