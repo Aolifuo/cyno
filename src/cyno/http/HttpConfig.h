@@ -29,12 +29,12 @@ struct HttpConfig {
     /* http request */
     RequestConfig request_config
     {
-        .max_line_and_headers_size = 1024 * 4,
+        .max_line_and_headers_size = 1024 * 4 - 32,
         .max_body_size = 1024 * 1024,
         .max_file_size = size_t(1024) * 1024 * 1024,
-        .receive_headers_timeout = 1000 * 10,
+        .receive_headers_timeout = 1000 * 15,
         .receive_body_timeout = 1000 * 15,
-        .keepalive_timeout = 1000 * 60
+        .keepalive_timeout = 1000 * 60,
     };
 };
 
