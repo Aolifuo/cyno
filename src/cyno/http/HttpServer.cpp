@@ -99,7 +99,15 @@ asio::awaitable<void> HttpServer::Impl::process(asio::ip::tcp::socket socket) {
     HttpParser<HttpRequest> parser;
     HttpRequest& req = parser.result();
     HttpResponse resp = HttpResponse::from_default();
-    asio::steady_timer timer(executor);
+    asio::steady_timer deadline(executor);
+
+    auto check_deadline = [&socket, &deadline] {
+        deadline.async_wait([&socket](asio::error_code err) {
+            if (!err) {
+                socket.close();
+            }
+        });
+    };
     
     try {
         // borrow buffer
@@ -110,46 +118,37 @@ asio::awaitable<void> HttpServer::Impl::process(asio::ip::tcp::socket socket) {
             
             // set timeout
             if (req.should_keep_alive) {
-                timer.expires_after(
+                deadline.expires_after(
                     std::chrono::milliseconds(http_config.request_config.keepalive_timeout));
             } else {
-                timer.expires_after(
+                deadline.expires_after(
                     std::chrono::milliseconds(http_config.request_config.receive_headers_timeout));
             }
             
-            timer.async_wait([&socket](std::error_code err) {
-                if (!err) {
-                    spdlog::warn("Accept requst first line and headers timeout");
-                    socket.close();
-                }
-            });
+            check_deadline();
 
             // read until \r\n\r\n
             co_await asio::async_read_until(socket, asio::dynamic_buffer(*buffer),
-                                                "\r\n\r\n", asio::use_awaitable);
-            timer.cancel_one();
+                                            "\r\n\r\n", asio::use_awaitable);
+            
+            // refresh deadline and set for receive body task
+            deadline.expires_after(
+                std::chrono::milliseconds(http_config.request_config.receive_body_timeout));
             try {
                 // parse first line and headers
                 parser.parse({buffer->data(), buffer->size()});
 
-                // set timeout
                 buffer->resize(http_config.request_config.max_line_and_headers_size);
-                timer.expires_after(
-                    std::chrono::milliseconds(http_config.request_config.receive_body_timeout));
+
                 // read body
                 for (; parser.state() != HttpParser<HttpRequest>::Success; ) {
-                    timer.async_wait([&socket](std::error_code err) {
-                        if (!err) {
-                            spdlog::warn("Accept request body timeout");
-                            socket.close();
-                        }
-                    });
+                    check_deadline();
                     size_t read_len = co_await socket.async_read_some(asio::buffer(*buffer),
                                                                         asio::use_awaitable);
-                    timer.cancel_one();
+                    deadline.cancel_one();
                     parser.parse({buffer->data(), read_len});
                 }
-                
+
                 // dispatch
                 auto url = parse_http_request_url(req.url);
                 req.path = std::move(url.path);
@@ -166,6 +165,7 @@ asio::awaitable<void> HttpServer::Impl::process(asio::ip::tcp::socket socket) {
             }
 
             buffer->assign(serialize_response(resp));
+
             // send
             co_await asio::async_write(socket, asio::buffer(*buffer), 
                                             asio::use_awaitable);
