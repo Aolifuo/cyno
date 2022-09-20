@@ -16,6 +16,10 @@ class HttpServer {
     CLASS_PIMPL_DECLARE(HttpServer)
 
 public:
+    enum State {
+        Stopped, Running
+    };
+
     HttpServer(asio::any_io_executor executor);
 
     void bind(std::string_view host, unsigned port);

@@ -21,6 +21,7 @@ using namespace std::chrono_literals;
 struct HttpServer::Impl {
     inline static std::pmr::synchronized_pool_resource sync_pool;
 
+    State state;
     asio::any_io_executor executor;
     asio::ip::tcp::acceptor acceptor;
 
@@ -47,7 +48,7 @@ void perfect_response(HttpResponse&, int status);
 CLASS_PIMPL_IMPLEMENT(HttpServer)
 
 HttpServer::HttpServer(asio::any_io_executor executor) {
-    impl = new Impl{executor, asio::ip::tcp::acceptor{executor}};
+    impl = new Impl{Stopped, executor, asio::ip::tcp::acceptor{executor}};
 }
 
 void HttpServer::bind(std::string_view host, unsigned port) {
@@ -68,16 +69,17 @@ void HttpServer::exception_handler(std::unique_ptr<ExceptionHandler> handler) {
 }
 
 void HttpServer::start() {
+    impl->state = Running;
     asio::co_spawn(impl->executor, impl->run_accept(), asio::detached);
 }
 
 void HttpServer::stop() {
-    
+    impl->state = Stopped;
 }
 
 asio::awaitable<void> HttpServer::Impl::run_accept() {
     try {
-        for (; ;) {
+        for (; state == Running;) {
             asio::ip::tcp::socket socket(acceptor.get_executor());
             
             co_await acceptor.async_accept(socket, asio::use_awaitable);
